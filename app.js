@@ -1,18 +1,40 @@
-//1.require
 const express = require('express')
 const Database = require('better-sqlite3')
 const path = require('path')
-const multer = require('multer')
 
+const joi = require('joi')
 
-//Establish a connection with the SQLite database.
-const db = Database(__dirname + '/database/chinook.sqlite');
+const router = express.Router()
+const db = Database(process.cwd() + '/database/chinook.sqlite');
+
+//IMPORT ANY ROUTER MODULES
+const artistsRouter = require('./routes/artists') //will look for index.js
+const albumsRouter = require('./routes/albums') 
+const tracksRouter = require('./routes/tracks') 
 
 //create an instance of an express app
 const app = express();
 
 //configure a folder to serve static content
 app.use(express.static('_FrontendStarterFiles'))
+app.use(express.urlencoded({extended: false}))//capture date to req.body
+app.use(express.json())//capture data in a post and assign to req.body
+
+//INJECT our ROUTERS INTO the APP
+app.use('/api/artists', artistsRouter)
+app.use('/api/albums', albumsRouter)
+app.use('/api/tracks', tracksRouter)
+
+
+//GET all MediaType
+app.get('/api/mediatypes', (req, res) => {
+    const statement = db.prepare('SELECT * FROM media_types')
+    const MediaType = statement.all();
+
+    res.json(MediaType)
+});
+
+
 
 //THEME
 app.get('/api/themes', (req, res) => {
@@ -22,82 +44,6 @@ app.get('/api/themes', (req, res) => {
     res.json(themes)
 });
 
-
-//Retrieve the endpoints of all artists.
-app.get('/api/artists', (req, res) => {
-    const statement = db.prepare('SELECT * FROM artists')
-    const artists = statement.all();
-
-    res.json(artists)
-});
-
-//Retrieve the endpoint of all artist's album.
-app.get('/api/albums', (req, res) => {
-    const statement = db.prepare('SELECT * FROM albums')
-    const albums = statement.all();
-
-    res.json(albums)
-});
-
-//get tracks by an albums's id
-app.get('/api/albums/:id/tracks', (req, res) => {
-    const statement = db.prepare('SELECT * FROM tracks WHERE AlbumId = ?');
-    const tracks = statement.all(req.params.id)
-
-    res.json(tracks);
-    
-});
-
-//get one artist
-app.get('/api/artists/:id', (req, res) => {
-    const statement = db.prepare('SELECT * FROM artists WHERE ArtistId = ?')
-    const data = statement.get(req.params.id)
-
-    if (data != undefined){
-        res.json(data)
-    } else{
-        res.status(404).send()
-    }
-});
-
-//get one albums
-app.get('/api/albums/:id', (req, res) => {
-    const albumId = req.params.id
-    const statement = db.prepare('SELECT * FROM albums WHERE AlbumId = ?')
-    const data = statement.get(albumId)
-
-    if (data != undefined){
-        res.json(data)
-    } else{
-        res.status(404).send()
-    }
-});
-
-//get albums by an artist's id
-app.get('/api/artists/:id/albums', (req, res) => {
-    const ArtistId = req.params.id;
-    const statement = db.prepare('SELECT * FROM albums WHERE ArtistId = ?');
-    const albums = statement.all(ArtistId);
-
-    res.json(albums);
-
-});
-
-//endpoinnt to handle file upload
-const storage = multer.diskStorage({
-    destination:path.join(__dirname, './_FrontendStarterFiles/albumart/'),
-    filename: function(req,file,callback){
-       callback(null,Date.now().toString() + file.originalname )
-    }
-})
-const upload = multer({storage:storage});
-app.post(`/api/albums/:id/albumart`, upload.single('albumart'), (req, res) => {
-        const updateStatement = db.prepare('UPDATE albums SET Albumart = ? WHERE AlbumId = ?');
-        const result = updateStatement.run([req.file.filename,req.params.id]);
-        console.log(result);
-        res.json(result);
-    });
-   
 
 //Listen on the port number, start the service. After successful start-up (nodemon), execute the callback function.
 app.listen(3000,()=>{
